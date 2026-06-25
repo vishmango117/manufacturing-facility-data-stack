@@ -1,0 +1,24 @@
+{
+  "name": "erp-jdbc-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics.regex": "erp\\.public\\..*",
+    "connection.url": "jdbc:postgresql://warehouse:5432/facility?currentSchema=erp_raw",
+    "connection.user": "facility",
+    "connection.password": "facility",
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "auto.create": "true",
+    "auto.evolve": "true",
+    "insert.mode": "upsert",
+    "pk.mode": "record_key",
+    "delete.enabled": "true",
+    "transforms": "route",
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "erp\\.public\\.(.*)",
+    "transforms.route.replacement": "$1"
+  }
+}

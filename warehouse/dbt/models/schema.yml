@@ -1,0 +1,196 @@
+version: 2
+
+models:
+  # ---------------------------------------------------------------------------
+  # Dimensions
+  # ---------------------------------------------------------------------------
+  - name: dim_date
+    description: "Calendar dimension at day grain"
+    columns:
+      - name: date_id
+        description: "Primary key — date in YYYY-MM-DD format"
+        tests:
+          - not_null
+          - unique
+      - name: day_name
+        tests:
+          - accepted_values:
+              values: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+  - name: dim_time
+    description: "Time-of-day at minute grain (0-1439)"
+    columns:
+      - name: time_key
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_location
+    description: "Building hierarchy dimension"
+    columns:
+      - name: building
+        tests:
+          - not_null
+          - unique
+      - name: building_code
+        tests:
+          - not_null
+
+  - name: dim_equipment
+    description: "HVAC equipment dimension — seeded from machines.csv. bmsTag joins to BMS telemetry; energyTag joins to EMS telemetry."
+    columns:
+      - name: equipment_key
+        tests:
+          - not_null
+          - unique
+      - name: name
+        tests:
+          - not_null
+          - unique
+      - name: equipment_type
+        tests:
+          - accepted_values:
+              values: ['Chiller', 'AHU', 'Cooling Tower', 'Air Compressor', 'Air Coolers']
+      - name: is_active
+        tests:
+          - accepted_values:
+              values: [true, false]
+
+  - name: dim_machine
+    description: "Manufacturing machine dimension (Injection Moulding / CNC / Heating). energy_tag joins to EMS telemetry."
+    columns:
+      - name: machine_key
+        tests:
+          - not_null
+          - unique
+      - name: machine_id
+        tests:
+          - not_null
+          - unique
+      - name: machine_type
+        tests:
+          - accepted_values:
+              values: ['INJECTION_MOULDING', 'CNC', 'HEATING']
+
+  - name: dim_product
+    description: "Product/SKU dimension from ERP"
+    columns:
+      - name: product_key
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_work_order
+    description: "Work order dimension from ERP/MES"
+    columns:
+      - name: work_order_key
+        tests:
+          - not_null
+          - unique
+      - name: work_order_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_shift
+    description: "Shift dimension from ERP"
+    columns:
+      - name: shift_key
+        tests:
+          - not_null
+          - unique
+
+  # ---------------------------------------------------------------------------
+  # Facts
+  # ---------------------------------------------------------------------------
+  - name: fact_hvac_reading
+    description: "HVAC telemetry readings at 1-minute grain per equipment"
+    columns:
+      - name: equipment_key
+        description: "FK to dim_equipment"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_equipment')
+              field: equipment_key
+      - name: date_id
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_id
+      - name: time_key
+        tests:
+          - relationships:
+              to: ref('dim_time')
+              field: time_key
+
+  - name: fact_energy_reading
+    description: "Manufacturing machine energy readings at 1-minute grain"
+    columns:
+      - name: machine_key
+        description: "FK to dim_machine"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_machine')
+              field: machine_key
+      - name: date_id
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_id
+      - name: time_key
+        tests:
+          - relationships:
+              to: ref('dim_time')
+              field: time_key
+      - name: total_power
+        tests:
+          - not_null
+      - name: total_energy
+        tests:
+          - not_null
+
+  - name: fact_production
+    description: "Production records from ERP/MES"
+    columns:
+      - name: work_order_key
+        tests:
+          - relationships:
+              to: ref('dim_work_order')
+              field: work_order_key
+      - name: machine_key
+        tests:
+          - relationships:
+              to: ref('dim_machine')
+              field: machine_key
+
+  - name: fact_machine_state
+    description: "Machine state intervals (RUN/IDLE/DOWN) for downtime analysis"
+    columns:
+      - name: machine_key
+        tests:
+          - relationships:
+              to: ref('dim_machine')
+              field: machine_key
+
+sources:
+  - name: raw
+    database: "{{ env_var('DBT_DATABASE', 'facility') }}"
+    schema: raw
+    tables:
+      - name: telemetry
+        description: "Unified raw telemetry hypertable (BMS + EMS)"
+        columns:
+          - name: time
+            tests:
+              - not_null
+          - name: value
+            tests:
+              - not_null
+          - name: dimensions
+            tests:
+              - not_null
+          - name: device_id
+            tests:
+              - not_null

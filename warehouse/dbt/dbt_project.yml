@@ -1,0 +1,38 @@
+#
+# dbt project: Manufacturing Facility Data Platform
+#
+# staging/  — unpack raw.telemetry JSONB, dedupe CDC
+# marts/dims — Kimball conformed dimensions
+# marts/facts — Kimball fact tables
+# seeds    — machines.csv → dim_equipment
+#
+
+name: 'acn_platform'
+version: '1.0.0'
+config-version: 2
+
+profile: 'acn_platform'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  acn_platform:
+    +materialized: view
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+      dims:
+        +materialized: table
+      facts:
+        +materialized: table
+
+seeds:
+  acn_platform:
+    +quote_columns: false

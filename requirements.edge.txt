@@ -1,0 +1,5 @@
+# Shared dependencies for simulators (Modbus slaves) and gateways (publishers)
+pymodbus==3.6.9
+confluent-kafka[avro,schemaregistry]==2.5.3
+fastavro==1.9.7
+requests==2.32.3

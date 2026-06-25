@@ -1,0 +1,30 @@
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    access: proxy
+    url: jdbc:postgresql://warehouse:5432/facility
+    user: facility
+    password: facility
+    poolMinSize: 1
+    poolMaxSize: 10
+    authModule: basic
+    settings:
+      database: facility
+    additionalOptions:
+      - key: stringtype
+        value: unspecified
+
+  - name: Warehouse-Marts
+    type: postgres
+    access: proxy
+    url: jdbc:postgresql://warehouse:5432/facility?currentSchema=marts
+    user: facility
+    password: facility
+    poolMinSize: 1
+    poolMaxSize: 10
+    authModule: basic
+    settings:
+      database: facility
+    additionalOptions:
+      - key: stringtype
+        value: unspecified

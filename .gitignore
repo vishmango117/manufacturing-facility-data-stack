@@ -1,0 +1,45 @@
+# Environment files (NEVER commit real credentials)
+.env
+.env.*.local
+!.env.example
+
+# Docker / Podman volumes
+*_data/
+docker-volumes/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+*.whl
+.venv/
+venv/
+
+# dbt
+target/
+dbt_packages/
+profiles.yml
+*.swp
+*.swo
+*~
+
+# Airflow
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/ai
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Samples (reference data — tracked intentionally, not listed here)

@@ -1,0 +1,70 @@
+apiVersion: 1
+
+datasources:
+  - folder: Facility
+    uid: timescaledb
+    name: TimescaleDB
+    type: postgres
+
+dashboards:
+  - name: BMS Real-Time HVAC
+    folder: Facility
+    datasource: TimescaleDB
+    interval: 1m
+    refresh: 30s
+    time:
+      from: now-24h
+      to: now
+    panels:
+      - title: "Supply Temp by Building"
+        type: timeseries
+        datasource: TimescaleDB
+        targets:
+          - expr: "avg(value->>'Supply_Temp') by (building)"
+            datasource: TimescaleDB
+        gridPos: {h: 8, w: 12, x: 0, y: 0}
+      - title: "Return Temp by Building"
+        type: timeseries
+        datasource: TimescaleDB
+        targets:
+          - expr: "avg(value->>'Return_Temp') by (building)"
+            datasource: TimescaleDB
+        gridPos: {h: 8, w: 12, x: 12, y: 0}
+      - title: "Chiller ΔT (Return - Supply)"
+        type: timeseries
+        datasource: TimescaleDB
+        targets:
+          - expr: "avg(value->>'Chilled_Water_Return_Temp' - value->>'Chilled_Water_Supply_Temp') by (building)"
+            datasource: TimescaleDB
+        gridPos: {h: 8, w: 12, x: 0, y: 8}
+      - title: "Total HVAC Power (EMS)"
+        type: timeseries
+        datasource: TimescaleDB
+        targets:
+          - expr: "sum(value->>'totalPower') by (building)"
+            datasource: TimescaleDB
+        gridPos: {h: 8, w: 12, x: 12, y: 8}
+
+  - title: "EMS Manufacturing Energy"
+    folder: Facility
+    datasource: TimescaleDB
+    interval: 1m
+    refresh: 30s
+    time:
+      from: now-24h
+      to: now
+    panels:
+      - title: "Energy by Machine Type"
+        type: timeseries
+        datasource: TimescaleDB
+        targets:
+          - expr: "sum(value->>'totalPower') by (dimensions->>'equipmentType')"
+            datasource: TimescaleDB
+        gridPos: {h: 8, w: 12, x: 0, y: 0}
+      - title: "Cumulative Energy by Machine"
+        type: timeseries
+        datasource: TimescaleDB
+        targets:
+          - expr: "value->>'totalEnergy' by (dimensions->>'name')"
+            datasource: TimescaleDB
+        gridPos: {h: 8, w: 12, x: 12, y: 0}

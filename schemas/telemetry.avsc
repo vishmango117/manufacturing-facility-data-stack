@@ -1,0 +1,14 @@
+{
+  "namespace": "acn.platform.telemetry",
+  "name": "Telemetry",
+  "type": "record",
+  "fields": [
+    {"name": "deviceId",    "type": "string"},
+    {"name": "source",      "type": "string"},
+    {"name": "equipmentType","type": "string"},
+    {"name": "building",    "type": "string"},
+    {"name": "ts_utc",      "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "value",       "type": {"type": "map", "values": "double"}},
+    {"name": "metadata",    "type": {"type": "map", "values": "string"}}
+  ]
+}
