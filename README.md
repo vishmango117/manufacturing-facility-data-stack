@@ -53,19 +53,19 @@ component inventory, data model, lessons learned, and future work.
 
 ## Technology Stack
 
-| Concern | Choice |
-|---|---|
-| Field protocol (BMS/EMS) | Modbus TCP, simulated, 1-min interval (`pymodbus`) |
-| Streaming backbone | Apache Kafka (KRaft mode, no ZooKeeper) |
-| Serialization | **Avro + Confluent Schema Registry** |
-| ERP/MES ingest | Postgres source DB + REST API; **Debezium** CDC → Kafka |
-| Stream processing | **PyFlink** (event-time windowing) → Postgres |
-| Warehouse | **Postgres + TimescaleDB** (hypertables for raw telemetry, star schema for marts) |
-| Transform / modeling | **dbt** (Kimball dims + facts) |
-| Orchestration | **Apache Airflow** (dbt runs + API batch pulls) |
-| Data quality | **dbt tests** (not_null/unique/relationships/accepted_values) |
-| BI / serving | **Metabase** (native Postgres connector) + **Grafana** (real-time ops) |
-| Deployment | **Docker Compose** with profiles |
+| Concern                  | Choice                                                                            |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| Field protocol (BMS/EMS) | Modbus TCP, simulated, 1-min interval (`pymodbus`)                                |
+| Streaming backbone       | Apache Kafka (KRaft mode, no ZooKeeper)                                           |
+| Serialization            | **Avro + Confluent Schema Registry**                                              |
+| ERP/MES ingest           | Postgres source DB + REST API; **Debezium** CDC → Kafka                           |
+| Stream processing        | **PyFlink** (event-time windowing) → Postgres                                     |
+| Warehouse                | **Postgres + TimescaleDB** (hypertables for raw telemetry, star schema for marts) |
+| Transform / modeling     | **dbt** (Kimball dims + facts)                                                    |
+| Orchestration            | **Apache Airflow** (dbt runs + API batch pulls)                                   |
+| Data quality             | **dbt tests** (not_null/unique/relationships/accepted_values)                     |
+| BI / serving             | **Metabase** (native Postgres connector) + **Grafana** (real-time ops)            |
+| Deployment               | **Docker Compose** with profiles                                                  |
 
 ## Quick Start
 
@@ -109,14 +109,14 @@ docker compose --profile warehouse --profile stream --profile edge --profile orc
 
 ### Service Ports
 
-| Service | Port | URL |
-|---|---|---|
-| Metabase | 3000 | http://localhost:3000 |
-| Grafana | 3001 | http://localhost:3001 (admin/admin) |
-| Kafka UI | 8090 | http://localhost:8090 |
-| Flink UI | 8081 | http://localhost:8081 |
-| ERP API | 8000 | http://localhost:8000 |
-| Airflow | 8082 | http://localhost:8082 (admin/admin) |
+| Service              | Port | URL                                       |
+| -------------------- | ---- | ----------------------------------------- |
+| Metabase             | 3000 | http://localhost:3000                     |
+| Grafana              | 3001 | http://localhost:3001 (admin/admin)       |
+| Kafka UI             | 8090 | http://localhost:8090                     |
+| Flink UI             | 8081 | http://localhost:8081                     |
+| ERP API              | 8000 | http://localhost:8000                     |
+| Airflow              | 8082 | http://localhost:8082 (admin/admin)       |
 | Warehouse (Postgres) | 5432 | psql -h localhost -U facility -d facility |
 
 ## Repository Structure
@@ -179,12 +179,12 @@ to its energy consumption, enabling:
 
 The `raw.telemetry` hypertable uses a schema-on-read approach with 4 columns:
 
-| Column | Type | Description |
-|---|---|---|
-| `time` | `timestamptz` | Event time (UTC) |
-| `value` | `jsonb` | Meter/sensor readings |
-| `dimensions` | `jsonb` | Building, equipment type, device name |
-| `metadata` | `jsonb` | msgId, deviceId, source, topic, schema_ver |
+| Column       | Type          | Description                                |
+| ------------ | ------------- | ------------------------------------------ |
+| `time`       | `timestamptz` | Event time (UTC)                           |
+| `value`      | `jsonb`       | Meter/sensor readings                      |
+| `dimensions` | `jsonb`       | Building, equipment type, device name      |
+| `metadata`   | `jsonb`       | msgId, deviceId, source, topic, schema_ver |
 
 dbt staging unpacks JSONB into typed columns for the strict Kimball facts downstream.
 
@@ -251,16 +251,21 @@ docker compose exec warehouse psql -U facility -d facility -c "
 - **Schema-evolution governance** + dead-letter queues for malformed telemetry.
 - **Per-device Kafka topics** as an alternative to per-domain/type topic strategy.
 - **Extended EMS metrics** (V/A/PF/Hz) for power quality analysis.
+- **Automated Testing suite** (Unit tests for edge modules, end-to-end integration tests for the data pipeline).
+- **Extensive Documentation** (Full API specifications, interactive data lineage diagrams, and operational runbooks).
+- **CI/CD Pipelines via GitHub Actions** (Automated linting, testing, and container image build/push workflows).
 
 ## Troubleshooting
 
 ### Kafka not starting
+
 ```bash
 docker compose logs kafka
 docker compose logs kafka-controller
 ```
 
 ### Debezium connector failing to register
+
 ```bash
 # Check Kafka Connect is healthy
 curl http://localhost:8083/
@@ -270,6 +275,7 @@ cd erp/debezium && CONNECT_URL=http://localhost:8083 sh register.sh
 ```
 
 ### Flink job failing
+
 ```bash
 # Check Flink jobmanager logs
 docker compose logs flink-jobmanager
@@ -279,6 +285,7 @@ docker compose exec flink-jobmanager curl -s http://schema-registry:8081/subject
 ```
 
 ### dbt build failing
+
 ```bash
 # Check warehouse is healthy first
 docker compose --profile warehouse up -d
@@ -288,4 +295,5 @@ docker compose exec airflow-scheduler dbt run --profiles-dir /opt/airflow/dbt --
 ```
 
 ### Port conflicts
+
 Edit `.env` to change port mappings in `docker-compose.yml` or stop conflicting services on the host.
