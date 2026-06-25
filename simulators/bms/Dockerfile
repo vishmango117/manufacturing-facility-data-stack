@@ -6,6 +6,7 @@ COPY requirements.edge.txt .
 RUN pip install --no-cache-dir -r requirements.edge.txt
 
 COPY common ./common
+COPY simulators/__init__.py ./simulators/__init__.py
 COPY simulators/bms ./simulators/bms
 
 ENV PYTHONUNBUFFERED=1 PYTHONPATH=/app MODBUS_HOST=0.0.0.0 MODBUS_PORT=5020

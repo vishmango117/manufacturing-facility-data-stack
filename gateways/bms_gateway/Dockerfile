@@ -6,6 +6,7 @@ COPY requirements.edge.txt .
 RUN pip install --no-cache-dir -r requirements.edge.txt
 
 COPY common ./common
+COPY gateways/__init__.py ./gateways/__init__.py
 COPY gateways/bms_gateway ./gateways/bms_gateway
 
 ENV PYTHONUNBUFFERED=1 PYTHONPATH=/app

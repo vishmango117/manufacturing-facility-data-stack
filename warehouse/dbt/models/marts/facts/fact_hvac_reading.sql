@@ -1,17 +1,13 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * fact_hvac_reading — HVAC telemetry fact at 1-minute grain.
-   *
-   * Wide per equipment-type facts are recommended for clean Metabase semantics.
-   * This model produces a unified view per equipment type, joined to
-   * dim_equipment via bmsTag (BMS device name).
-   */
-}}
+{#- fact_hvac_reading — HVAC telemetry fact at 1-minute grain joined to dim_equipment via bmstag. -#}
 
-with stg as (
-    select * from {{ ref('stg_telemetry') }}
+with ahu_stg as (
+    select * from {{ ref('stg_telemetry_ahu') }}
+),
+
+chiller_stg as (
+    select * from {{ ref('stg_telemetry_chiller') }}
 ),
 
 dim_equipment as (
@@ -26,61 +22,54 @@ dim_time as (
     select * from {{ ref('dim_time') }}
 ),
 
--- AHU readings
 ahu as (
     select
         e.equipment_key,
         d.date_id,
         t.time_key,
-        s.ahu_supply_temp,
-        s.ahu_return_temp,
-        s.ahu_supply_rh,
-        s.ahu_return_rh,
-        s.ahu_supply_flow,
-        s.delta_temp,
-        s.supply_temp_status,
         s.device_name,
         s.building,
         s.equipment_type,
-        s.total_power,
-        s.total_energy
-    from stg s
-    join dim_equipment e on s.device_name = e.bmsTag
+        s.ahu_supply_temp::numeric   as supply_temp,
+        s.ahu_return_temp::numeric   as return_temp,
+        s.ahu_supply_rh::numeric     as supply_rh,
+        s.ahu_return_rh::numeric     as return_rh,
+        s.ahu_supply_flow::numeric   as supply_flow,
+        s.delta_temp                 as delta_temp,
+        s.supply_temp_status,
+        null::numeric                as cws_temp,
+        null::numeric                as cwr_temp
+    from ahu_stg s
+    join dim_equipment e on s.device_name = e.bmstag
     join dim_date d on s."time"::date = d.date_id
-    join dim_time t on date_part('hour', s."time") * 60 + date_part('minute', s."time") = t.minute_of_day
-    where s.equipment_type = 'AHU'
+    join dim_time t
+        on date_part('hour', s."time") * 60 + date_part('minute', s."time") = t.time_key
 ),
 
--- Chiller readings
 chiller as (
     select
         e.equipment_key,
         d.date_id,
         t.time_key,
-        s.chiller_cws_temp,
-        s.chiller_cwr_temp,
-        s.chiller_cds_temp,
-        s.chiller_cdr_temp,
-        s.delta_temp,
-        s.delta_pct,
-        s.supply_temp_status,
         s.device_name,
         s.building,
         s.equipment_type,
-        s.total_power,
-        s.total_energy
-    from stg s
-    join dim_equipment e on s.device_name = e.bmsTag
+        null::numeric                as supply_temp,
+        null::numeric                as return_temp,
+        null::numeric                as supply_rh,
+        null::numeric                as return_rh,
+        null::numeric                as supply_flow,
+        s.delta_temp                 as delta_temp,
+        s.supply_temp_status,
+        s.chiller_cws_temp::numeric  as cws_temp,
+        s.chiller_cwr_temp::numeric  as cwr_temp
+    from chiller_stg s
+    join dim_equipment e on s.device_name = e.bmstag
     join dim_date d on s."time"::date = d.date_id
-    join dim_time t on date_part('hour', s."time") * 60 + date_part('minute', s."time") = t.minute_of_day
-    where s.equipment_type = 'Chillers'
-),
-
--- Combined HVAC fact
-combined as (
-    select * from ahu
-    union all
-    select * from chiller
+    join dim_time t
+        on date_part('hour', s."time") * 60 + date_part('minute', s."time") = t.time_key
 )
 
-select * from combined
+select * from ahu
+union all
+select * from chiller

@@ -1,16 +1,9 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * fact_machine_state — machine state intervals for downtime analysis.
-   *
-   * Grain: 1 row per machine per state interval (RUN/IDLE/DOWN).
-   * Sourced from ERP machine_states table via CDC.
-   */
-}}
+{#- fact_machine_state — machine state intervals for downtime analysis. Grain: 1 row per machine per state interval (RUN/IDLE/DOWN). Sourced from ERP machine_states table via CDC. -#}
 
 with machine_states as (
-    select * from erp_raw.machine_states
+    select * from {{ ref('stg_erp_machine_states') }}
 ),
 
 dim_machine as (
@@ -38,7 +31,7 @@ joined as (
     from machine_states ms
     join dim_machine m on ms.machine_id = m.machine_id
     join dim_date d on ms.start_time::date = d.date_id
-    join dim_time t on date_part('hour', ms.start_time) * 60 + date_part('minute', ms.start_time) = t.minute_of_day
+    join dim_time t on date_part('hour', ms.start_time) * 60 + date_part('minute', ms.start_time) = t.time_key
 )
 
 select * from joined

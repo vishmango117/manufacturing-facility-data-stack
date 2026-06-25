@@ -20,7 +20,7 @@ from pymodbus.datastore import (
 )
 from pymodbus.server import StartAsyncTcpServer
 
-from .generators import EnergyIntegrator, bms_metric_value, ems_power
+from .generators import EnergyIntegrator, bms_values, ems_power
 from .modbus_codec import encode_metrics
 from .registry import Device, devices_for
 
@@ -49,7 +49,7 @@ def _compute_values(d: Device, now: float, integ: EnergyIntegrator) -> list[floa
         return [power, energy]
     import random
     fault = random.random() < _FAULT_PROBABILITY
-    return [bms_metric_value(m, now, fault=fault) for m in d.metrics]
+    return bms_values(d, now, fault=fault)
 
 
 async def _refresh_loop(context: ModbusServerContext, devices: list[Device],

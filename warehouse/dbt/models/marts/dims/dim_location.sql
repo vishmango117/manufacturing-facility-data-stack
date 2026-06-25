@@ -1,11 +1,6 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * dim_location — building hierarchy from building names.
-   * Derives building code (BA/BB/BG) from building name.
-   */
-}}
+{#- dim_location — building hierarchy from building names. Derives building code (BA/BB/BG) from building name. -#}
 
 select distinct
     building,

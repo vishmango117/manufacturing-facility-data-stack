@@ -1,0 +1,108 @@
+name: CI/CD Stack Build & Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*.*.*" ]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service_name: connect
+            context: ./connect
+            dockerfile: Dockerfile
+          - service_name: bms-simulator
+            context: .
+            dockerfile: simulators/bms/Dockerfile
+          - service_name: ems-simulator
+            context: .
+            dockerfile: simulators/ems/Dockerfile
+          - service_name: bms-gateway
+            context: .
+            dockerfile: gateways/bms_gateway/Dockerfile
+          - service_name: ems-gateway
+            context: .
+            dockerfile: gateways/ems_gateway/Dockerfile
+          - service_name: erp-api
+            context: .
+            dockerfile: erp/api/Dockerfile
+          - service_name: flink-processor
+            context: .
+            dockerfile: flink/Dockerfile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service_name }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ id.meta.outputs.tags }}
+          labels: ${{ id.meta.outputs.labels }}
+
+  release:
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install PyYAML
+
+      - name: Generate release docker-compose
+        run: |
+          # Get the current tag (e.g., v1.0.0)
+          TAG=${GITHUB_REF#refs/tags/}
+          # Get registry base (e.g., ghcr.io/owner/repo)
+          REGISTRY_BASE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}"
+
+          python3 scripts/generate_release_compose.py \
+            docker-compose.yml \
+            docker-compose.release.yml \
+            --tag "$TAG" \
+            --registry "$REGISTRY_BASE"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            docker-compose.release.yml

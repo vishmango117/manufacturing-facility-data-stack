@@ -1,10 +1,6 @@
 {{ config(materialized='view') }}
 
-{{
-  /*
-   * stg_telemetry_chiller — Chiller-specific wide view with derived COP proxy.
-   */
-}}
+{#- stg_telemetry_chiller — Chiller-specific wide view with derived COP proxy. -#}
 
 with stg_telemetry as (
     select * from {{ ref('stg_telemetry') }}
@@ -19,15 +15,20 @@ filtered as (
 with_derived as (
     select
         *,
-        coalesce(cwr_temp - cws_temp, 0) as delta_temp,
+        coalesce(chiller_cwr_temp::numeric - chiller_cws_temp::numeric, 0) as delta_temp,
         case
-            when cwr_temp is not null and cws_temp is not null and cws_temp > 0
-                then round((cwr_temp - cws_temp) / cws_temp::numeric * 100, 2)
+            when chiller_cwr_temp is not null and chiller_cws_temp is not null
+                 and chiller_cws_temp::numeric > 0
+                then round(
+                    (chiller_cwr_temp::numeric - chiller_cws_temp::numeric)
+                    / chiller_cws_temp::numeric * 100, 2
+                )
             else null
         end as delta_pct,
         case
-            when cws_temp is not null and cws_temp between 4 and 12 then 'OK'
-            when cws_temp is not null then 'WARN'
+            when chiller_cws_temp is not null
+                 and chiller_cws_temp::numeric between 4 and 12 then 'OK'
+            when chiller_cws_temp is not null then 'WARN'
             else 'MISSING'
         end as supply_temp_status
     from filtered

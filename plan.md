@@ -2,17 +2,30 @@
 
 ## Build Status (2026-06-24)
 
-| # | Workstream | Status |
-|---|---|---|
-| 1 | Foundation: compose, env, registry, Kafka platform | **DONE** |
-| 2 | BMS HVAC simulators + per-device publishers | **DONE** |
-| 3 | EMS manufacturing-machine simulators + per-device publishers | **DONE** |
-| 4 | ERP/MES source DB + FastAPI + Debezium CDC | **DONE** |
-| 5 | PyFlink stream jobs → unified raw.telemetry | **DONE** |
-| 6 | Warehouse init + dbt Kimball star schema | **DONE** |
-| 7 | Airflow orchestration + Metabase/Grafana serving + README | **DONE** |
+| #   | Workstream                                                   | Status   |
+| --- | ------------------------------------------------------------ | -------- |
+| 1   | Foundation: compose, env, registry, Kafka platform           | **DONE** |
+| 2   | BMS HVAC simulators + per-device publishers                  | **DONE** |
+| 3   | EMS manufacturing-machine simulators + per-device publishers | **DONE** |
+| 4   | ERP/MES source DB + FastAPI + Debezium CDC                   | **DONE** |
+| 5   | PyFlink stream jobs → unified raw.telemetry                  | **DONE** |
+| 6   | Warehouse init + dbt Kimball star schema                     | **DONE** |
+| 7   | Airflow orchestration + Metabase/Grafana serving + README    | **DONE** |
 
 All workstreams complete. Repository is ready for `docker compose up`.
+
+### BMS/EMS Simulator Detail (2026-06-25)
+
+Equipment-type-specific generators implemented in `common/generators.py`:
+
+- **Chillers**: CHWS held at 7 °C setpoint; CHWR ΔT (3-8 °C) scales with diurnal load; condenser supply/return tracks ambient heat rejection.
+- **AHU**: supply-air setpoint 14 °C; return air rises with occupancy; supply/return RH correlated; optional Supply_Flow with fan-stall fault.
+- **CoolingTower MainHeader**: outdoor temp/RH with anti-correlated diurnal drift (hotter day → lower RH).
+- **Chiller MainHeader**: all 8 metrics correlated (CHW/CW temps + differential pressures + flow rate).
+- **Air Compressors**: staged flow with 5-minute step-changes (4 capacity stages).
+- **Air Coolers**: mild supply-temp drift following zone thermal load.
+- **EMS (all 3 types)**: richer cycle phases — injection moulding clamp/inject/hold/eject, CNC 6-pass stepped spindle, heating ramp/soak/overshoot-correction/cool sawtooth.
+- Validated: all 57 devices (39 BMS + 18 EMS) produce typed floats in realistic ranges.
 
 ## Context
 
@@ -24,6 +37,7 @@ correlate energy consumption against HVAC operation, machine state, and producti
 (e.g. energy cost per unit produced, OEE vs. facility load).
 
 This plan delivers a **containerized, platform-agnostic** reference data stack that:
+
 - Simulates realistic field devices over **Modbus TCP** for BMS + EMS at a 1-minute cadence.
 - Streams BMS/EMS telemetry through **Apache Kafka** (Avro + Schema Registry).
 - Captures ERP/MES changes via **Debezium CDC** into the same Kafka backbone.
@@ -37,19 +51,19 @@ Everything runs under a single **Docker Compose** stack (profiles per layer).
 
 ## Confirmed Technology Decisions
 
-| Concern | Choice |
-|---|---|
-| Field protocol (BMS/EMS) | Modbus TCP, simulated, 1-min interval (`pymodbus`) |
-| Streaming backbone | Apache Kafka (KRaft mode, no ZooKeeper) |
-| Serialization | **Avro + Confluent Schema Registry** |
-| ERP/MES ingest | Postgres source DB + REST API; **Debezium** CDC → Kafka |
-| Stream processing | **PyFlink** (event-time windowing) → Postgres |
-| Warehouse | **Postgres + TimescaleDB** (hypertables for raw telemetry, star schema for marts) |
-| Transform / modeling | **dbt** (Kimball dims + facts) |
-| Orchestration | **Apache Airflow** (dbt runs + API batch pulls) |
-| Data quality | **dbt tests only** (not_null/unique/relationships/accepted_values), with docs for future Great Expectations |
-| BI / serving | **Metabase** (containerized) on the star schema + **Grafana** on TimescaleDB |
-| Deployment | **Docker Compose** with profiles |
+| Concern                  | Choice                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Field protocol (BMS/EMS) | Modbus TCP, simulated, 1-min interval (`pymodbus`)                                                          |
+| Streaming backbone       | Apache Kafka (KRaft mode, no ZooKeeper)                                                                     |
+| Serialization            | **Avro + Confluent Schema Registry**                                                                        |
+| ERP/MES ingest           | Postgres source DB + REST API; **Debezium** CDC → Kafka                                                     |
+| Stream processing        | **PyFlink** (event-time windowing) → Postgres                                                               |
+| Warehouse                | **Postgres + TimescaleDB** (hypertables for raw telemetry, star schema for marts)                           |
+| Transform / modeling     | **dbt** (Kimball dims + facts)                                                                              |
+| Orchestration            | **Apache Airflow** (dbt runs + API batch pulls)                                                             |
+| Data quality             | **dbt tests only** (not_null/unique/relationships/accepted_values), with docs for future Great Expectations |
+| BI / serving             | **Metabase** (containerized) on the star schema + **Grafana** on TimescaleDB                                |
+| Deployment               | **Docker Compose** with profiles                                                                            |
 
 ---
 
@@ -99,6 +113,7 @@ Everything runs under a single **Docker Compose** stack (profiles per layer).
 ## Design Principle — Per-Machine IoT Streams
 
 This is a **raw IoT** architecture, **not** a single BMS/EMS historian export. Therefore:
+
 - **Every machine is its own independent stream/publisher.** Each device runs as its own
   Modbus TCP slave and has its own publisher process that emits only that device's telemetry —
   mirroring real field IoT where each asset reports independently. No upstream aggregation.
@@ -141,14 +156,15 @@ All BMS/EMS telemetry lands in **one generic, schema-on-read hypertable** (`raw.
 so new device types/metrics need no DDL change — the gateways/Flink just emit a different
 JSONB payload. Columns map directly onto the sample fields:
 
-| Column | Type | Source from samples | Example (BMS chiller / EMS) |
-|---|---|---|---|
-| `time` | `timestamp without time zone` (UTC) | `timebucket` | `2024-01-07 23:00:00` |
-| `value` | `jsonb` | BMS `value` map / EMS `{totalEnergy,totalPower}` | `{"CHWS_Temp":6.82,"CHWR_Temp":10.07}` · `{"totalEnergy":193.1,"totalPower":201.2}` |
-| `dimensions` | `jsonb` | `building`, `equipmentType`/type, device `name` | `{"building":"Building-Alpha","equipmentType":"Chillers","name":"BA-Chiller01"}` |
-| `metadata` | `jsonb` | provenance / lineage / join tags | `{"msgId":"…","deviceId":"BA-Chiller01","source":"bms","topic":"bms.hvac.chiller","schema_ver":"v1"}` |
+| Column       | Type                                | Source from samples                              | Example (BMS chiller / EMS)                                                                           |
+| ------------ | ----------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `time`       | `timestamp without time zone` (UTC) | `timebucket`                                     | `2024-01-07 23:00:00`                                                                                 |
+| `value`      | `jsonb`                             | BMS `value` map / EMS `{totalEnergy,totalPower}` | `{"CHWS_Temp":6.82,"CHWR_Temp":10.07}` · `{"totalEnergy":193.1,"totalPower":201.2}`                   |
+| `dimensions` | `jsonb`                             | `building`, `equipmentType`/type, device `name`  | `{"building":"Building-Alpha","equipmentType":"Chillers","name":"BA-Chiller01"}`                      |
+| `metadata`   | `jsonb`                             | provenance / lineage / join tags                 | `{"msgId":"…","deviceId":"BA-Chiller01","source":"bms","topic":"bms.hvac.chiller","schema_ver":"v1"}` |
 
 Notes:
+
 - Hypertable partitioned on `time`; add **GIN indexes** on `dimensions` (and `value` if filtered)
   for fast key lookups; apply compression + retention policies on older chunks.
 - One physical table serves BMS **and** EMS; `metadata.source` (`bms`|`ems`) + `dimensions.name`
@@ -162,6 +178,7 @@ Notes:
 ## Kimball Dimensional Model (star schema)
 
 **Conformed dimensions** (shared across facts):
+
 - `dim_date` — calendar (day grain), generated via dbt.
 - `dim_time` — time-of-day (minute grain) for 1-min telemetry.
 - `dim_location` — building hierarchy from `building`/`buildingCode` (Building-Alpha/Beta/Gamma → BA/BB/BG), extensible to floor/zone.
@@ -172,6 +189,7 @@ Notes:
 - `dim_shift` — shift code, start/end, crew.
 
 **Fact tables** (each grain stated explicitly):
+
 - `fact_hvac_reading` — grain: 1 row per equipment per minute. Measures mirror the sample `value` keys per type:
   - AHU: `Supply_Temp`, `Return_Temp`, `Supply_RH`, `Return_RH`, optional `Supply_Flow`.
   - Chillers: `Chilled_Water_Supply_Temp`, `Chilled_Water_Return_Temp`, `Condensor_Supply_Temp`, `Condensor_Return_Temp` (+ derived ΔT / COP).
@@ -227,33 +245,39 @@ Each workstream below is self-contained and can be built/owned independently. Bu
 follows dependencies (platform → producers → processing → modeling → serving).
 
 ### Agent 1 — Kafka Platform & Schemas (foundation)
+
 - Stand up Kafka (KRaft, single broker for demo), Schema Registry, Kafka Connect (hosts Debezium), Kafka UI.
 - A single generic `Telemetry` Avro schema carries every BMS/EMS reading (typed envelope + `value` map<double>); registered automatically by the publishers.
 - Create domain/type topics **partitioned & keyed by `deviceId`** so each machine is one logical stream (e.g. `bms.hvac.chiller`, `bms.hvac.ahu`, `ems.machine.injection_moulding`, `ems.machine.cnc`, `ems.machine.heating`). Naming convention `<domain>.<group>.<type>`; key = `deviceId`.
 - **Deliverable:** healthy broker, registry reachable, topics + subjects created.
 
 ### Agent 2 — BMS HVAC IoT Simulators + Publishers (one stream per device)
+
 - `simulators/bms`: each HVAC asset (every AHU, Chiller, Chiller header, Cooling Tower header, Air Compressor, Air Cooler from `machines.csv`/`bms.csv`, across Building-Alpha/Beta/Gamma) is its **own `pymodbus` TCP slave unit**. Generators reproduce the sample metric keys + realistic ranges (diurnal temp curves, setpoint tracking, occasional faults), calibrated to `bms.csv` distributions.
 - `gateways/bms_gateway`: a publisher task **per device** (config-driven from the device registry) polling its own slave every 60s, decoding via the shared register codec, serializing to **Avro**, producing to the matching `bms.hvac.<type>` topic **keyed by `deviceId`**. Payload carries `building`, `equipmentType`, `name`/`deviceId`, and the metric `value` map — raw, per-device, un-aggregated.
 - **Deliverable:** independent 1-min Avro streams per HVAC device on `bms.hvac.*`, each device on its own key/partition, verifiable in Kafka UI.
 
 ### Agent 3 — EMS Manufacturing-Machine IoT Simulators + Publishers (one stream per machine)
+
 - `simulators/ems`: each **production machine** — Injection Moulding, CNC, Heating (multiple instances across buildings/floors) — is its **own Modbus TCP slave unit** exposing `totalEnergy` (cumulative) + `totalPower`, with **machine-type-specific load profiles** (injection moulding clamp/heat cycles, CNC spindle load steps, heating ramp/soak). Energy profiles correlate with each machine's production state so EMS ↔ MES joins are meaningful.
 - `gateways/ems_gateway`: one publisher task **per machine** → `ems.machine.<type>` topics, Avro, **keyed by `deviceId`/`energyTag`**. Reuses the shared publisher to minimize divergence.
 - **Deliverable:** independent 1-min Avro energy streams per manufacturing machine on `ems.machine.*`.
 
 ### Agent 4 — ERP/MES Source + API + Debezium CDC
+
 - `erp/source_db`: Postgres source DB with logical replication enabled (`wal_level=logical`); schema for `products`, `machines` (Injection Moulding / CNC / Heating, conformed with EMS via `energyTag`), `work_orders`, `production_runs`, `machine_states`, `shifts`, plus seed data.
 - `erp/api`: FastAPI service exposing MES/ERP production-scheduling endpoints (read schedule, create/update work orders, post production runs, machine states) — writes land in the source DB.
 - `erp/debezium`: Debezium Postgres source (Avro, ExtractNewRecordState unwrap) emits `erp.public.*` topics; Confluent JDBC sink auto-creates structured tables in `erp_raw` (`?currentSchema=erp_raw`, RegexRouter strips the prefix).
 - **Deliverable:** API mutations produce CDC events on `erp.*` topics and land in `erp_raw.*`.
 
 ### Agent 5 — PyFlink Stream Processing
+
 - `flink/`: one PyFlink Table API job consuming all `bms.hvac.*` and `ems.machine.*` via a single `topic-pattern` Kafka source (shared Avro schema, Schema Registry). Python scalar UDFs reshape each record into the unified `{time, value, dimensions, metadata}` shape; JDBC sink writes JSON text that Postgres coerces to `jsonb` (`stringtype=unspecified`). Event-time watermarks declared for future windowed/derived features.
 - Keep ERP CDC on a **Kafka Connect JDBC sink** straight into `erp_raw.*` (no Flink needed for slowly-changing reference data).
 - **Deliverable:** unified RAW telemetry continuously landing in the `raw.telemetry` hypertable.
 
 ### Agent 6 — Warehouse (Postgres + TimescaleDB) + dbt Kimball Models
+
 - `warehouse/init`: create extensions (`timescaledb`), schemas (`raw`, `staging`, `marts`, `erp_raw`), the unified **`raw.telemetry` hypertable** (`time`, `value` jsonb, `dimensions` jsonb, `metadata` jsonb + generated `device_id`/`source`) with GIN indexes + compression + retention policies. The Connect JDBC sink auto-creates the `erp_raw.*` tables.
 - `warehouse/dbt`: dbt project.
   - `staging/`: `stg_*` views that **unpack `raw.telemetry` JSONB** (`value->>'CHWS_Temp'`::numeric, `dimensions->>'building'`, etc.) filtered by `dimensions->>'equipmentType'` / `source`, plus `erp_raw` cleanup (type casts, dedupe CDC to latest).
@@ -264,15 +288,18 @@ follows dependencies (platform → producers → processing → modeling → ser
 - **Deliverable:** queryable star schema in `marts`, `dbt test` green, `dbt docs` generated.
 
 ### Agent 7 — Airflow Orchestration
+
 - `airflow/dags`: `dbt_build` DAG (staging → marts → test) on a schedule aligned to telemetry cadence; `erp_api_batch` DAG for any non-CDC API pulls (e.g. master data refresh). Use `BashOperator` for dbt.
 - **Deliverable:** scheduled, observable pipeline runs in Airflow UI.
 
 ### Agent 8 — BI / Serving
+
 - **Metabase** (`metabase/`, containerized): connect to the `marts` schema, model the star schema (table relationships + segments/metrics), and build dashboards (energy by building/equipment, chiller efficiency, kWh per produced unit, production vs. facility load). Self-serve question builder lets non-SQL users explore the dims/facts.
 - **Grafana** (`grafana/`): provisioned TimescaleDB datasource + real-time ops dashboards (HVAC trends, energy demand, alarms) for sub-minute operational visibility off `raw.telemetry`.
 - **Deliverable:** Metabase dashboards on the star schema + Grafana real-time ops dashboards, both provisioned in containers.
 
 ### Agent 9 — Compose Integration & Delivery
+
 - `docker-compose.yml` with **profiles** (`edge`, `stream`, `warehouse`, `orchestrate`, `bi`), healthchecks, dependency ordering, and `.env`.
 - `README.md`: one-command bring-up per profile, port map, troubleshooting, and a Future Work section (Great Expectations, medallion lakehouse w/ MinIO+Iceberg, Kafka Connect→Flink alternatives, Kubernetes/Strimzi migration, schema-evolution policy).
 - **Deliverable:** `docker compose --profile <x> up` brings the whole stack online reproducibly.

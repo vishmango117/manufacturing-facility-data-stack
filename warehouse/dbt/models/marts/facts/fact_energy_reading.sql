@@ -1,14 +1,6 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * fact_energy_reading — manufacturing machine energy fact at 1-minute grain.
-   *
-   * Grain: 1 row per machine per minute.
-   * Measures: totalPower, totalEnergy, delta_kWh.
-   * Joined to dim_machine via energyTag.
-   */
-}}
+{#- fact_energy_reading — manufacturing machine energy fact at 1-minute grain. Grain: 1 row per machine per minute. Measures: totalPower, totalEnergy, delta_kWh. Joined to dim_machine via energyTag. -#}
 
 with stg as (
     select * from {{ ref('stg_telemetry') }}
@@ -50,7 +42,7 @@ filtered as (
     from stg s
     join dim_machine m on s.device_name = m.energy_tag
     join dim_date d on s."time"::date = d.date_id
-    join dim_time t on date_part('hour', s."time") * 60 + date_part('minute', s."time") = t.minute_of_day
+    join dim_time t on date_part('hour', s."time") * 60 + date_part('minute', s."time") = t.time_key
     where s.equipment_type in ('INJECTION_MOULDING', 'CNC', 'HEATING')
 )
 

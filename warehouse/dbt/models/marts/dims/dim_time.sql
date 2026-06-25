@@ -1,11 +1,6 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * dim_time — time-of-day at minute grain (0–1439).
-   * Used for 1-minute grain telemetry facts.
-   */
-}}
+{#- dim_time — time-of-day at minute grain (0–1439). Used for 1-minute grain telemetry facts. -#}
 
 with minutes as (
     select generate_series(0, 1439) as minute_of_day

@@ -1,11 +1,6 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * dim_date — calendar dimension at day grain.
-   * Generated from a date range covering the facility data.
-   */
-}}
+{#- dim_date — calendar dimension at day grain. Generated from a date range covering the facility data. -#}
 
 with dates as (
     select generate_series(
@@ -20,7 +15,7 @@ select
     date_day                                            as full_date,
     extract(dow from date_day)                          as day_of_week,
     extract(isodow from date_day)                       as day_of_week_iso,
-    to_char(date_day, 'Day')                            as day_name,
+    trim(to_char(date_day, 'Day'))                      as day_name,
     extract(week from date_day)                         as week_of_year,
     extract(month from date_day)                        as month_of_year,
     to_char(date_day, 'Month')                          as month_name,

@@ -1,17 +1,11 @@
 {{ config(materialized='view') }}
 
-{{
-  /*
-   * stg_erp_raw — dedupe CDC records from erp_raw.* to latest per primary key.
-   *
-   * Debezium CDC produces one row per change event with __OP, __TS_MS columns.
-   * We keep the latest row per PK for each table.
-   */
-}}
+{#- stg_erp_raw — inventory of all CDC-landed erp_raw tables for exploratory use. -#}
 
-{% for table in ['products', 'machines', 'work_orders', 'production_runs', 'machine_states', 'shifts'] %}
-select * from erp_raw.{{ table }}
-{% if not loop.last %}
+select 'machines'        as table_name, count(*) as row_count from erp_raw.machines
 union all
-{% endif %}
-{% endfor %}
+select 'products'        as table_name, count(*) as row_count from erp_raw.products
+union all
+select 'shifts'          as table_name, count(*) as row_count from erp_raw.shifts
+union all
+select 'work_orders'     as table_name, count(*) as row_count from erp_raw.work_orders

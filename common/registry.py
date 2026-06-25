@@ -32,9 +32,10 @@ elif (Path("/samples") / "bms.csv").exists():
     SAMPLES_DIR = Path("/samples")
 else:
     # Walk up from this file to find samples/
-    _candidate = Path(__file__).resolve().parent.parent / "samples"
-    SAMPLES_DIR = _candidate if _candidate.exists() else Path("/samples")
-del _samples_env, _candidate
+    _cand = Path(__file__).resolve().parent.parent / "samples"
+    SAMPLES_DIR = _cand if _cand.exists() else Path("/samples")
+    del _cand
+del _samples_env
 
 
 # --------------------------------------------------------------------------- #

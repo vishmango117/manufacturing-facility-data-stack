@@ -1,16 +1,9 @@
 {{ config(materialized='view') }}
 
-{{
-  /*
-   * stg_erp_products — clean product table from CDC landing.
-   */
-}}
-
 select
-    id,
+    product_id,
     name,
     sku,
     family,
-    uom,
-    is_active
+    uom
 from erp_raw.products

@@ -43,3 +43,6 @@ airflow/ai
 Thumbs.db
 
 # Samples (reference data — tracked intentionally, not listed here)
+
+# MCP Exclusion
+.serena

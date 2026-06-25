@@ -1,14 +1,6 @@
 {{ config(materialized='table') }}
 
-{{
-  /*
-   * dim_machine — manufacturing machine dimension.
-   *
-   * Sourced from the ERP machines table (via CDC → erp_raw.machines).
-   * Covers Injection Moulding, CNC, and Heating production assets.
-   * The energy_tag joins to EMS telemetry (energyTag).
-   */
-}}
+{#- dim_machine — manufacturing machine dimension. Sourced from the ERP machines table (via CDC → erp_raw.machines). Covers Injection Moulding, CNC, and Heating production assets. The energy_tag joins to EMS telemetry (energyTag). -#}
 
 select
     row_number() over ()                                as machine_key,
