@@ -16,6 +16,7 @@ import sys
 import time
 
 import psycopg2
+import psycopg2.extras
 from confluent_kafka import Consumer, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -32,9 +33,12 @@ PG_DSN = os.environ.get(
 GROUP_ID = os.environ.get("CONSUMER_GROUP", "telemetry-consumer")
 TOPIC_PATTERN = re.compile(os.environ.get("TOPIC_PATTERN_RE", r"(bms|ems)\..*"))
 
+# The single %s placeholder is expanded by psycopg2.extras.execute_values into
+# one multi-row VALUES list, so each flush costs a single parsed statement /
+# round-trip instead of one per row (executemany sends one INSERT per row).
 INSERT_SQL = """
 INSERT INTO raw.telemetry (time, value, dimensions, metadata)
-VALUES (%s, %s, %s, %s)
+VALUES %s
 """
 
 _running = True
@@ -94,7 +98,7 @@ def main() -> None:
         if not batch:
             return
         try:
-            cur.executemany(INSERT_SQL, batch)
+            psycopg2.extras.execute_values(cur, INSERT_SQL, batch)
             pg.commit()
             log.info("Inserted %d rows into raw.telemetry", len(batch))
         except Exception as exc:
